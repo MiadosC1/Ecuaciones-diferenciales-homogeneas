@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Cola - Servidor Web</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 40px;
+        }
+        
+        @media (max-width: 900px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .form-section h2 {
+            color: #333;
+            margin-bottom: 25px;
+            font-size: 1.5em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+        
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .help-text {
+            font-size: 0.85em;
+            color: #999;
+            margin-top: 5px;
+        }
+        
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 20px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .results-section {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        .results-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .grafica {
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 900px) {
+            .stats {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .stat-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .stat-label {
+            color: #999;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            color: #667eea;
+            font-size: 1.8em;
+            font-weight: 700;
+        }
+        
+        .tabla-datos {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+        
+        th {
+            background: #f8f9fa;
+            padding: 10px;
+            text-align: left;
+            color: #555;
+            font-weight: 600;
+            border-bottom: 2px solid #667eea;
+            position: sticky;
+            top: 0;
+        }
+        
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #c33;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #3c3;
+            margin-bottom: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Simulador de Cola de Solicitudes</h1>
+            <p>Ecuación diferencial homogénea: dq/dt = a + q/t</p>
+        </div>
+        
+        <div class="content">
+            <!-- Formulario -->
+            <div class="form-section">
+                <h2>Parámetros</h2>
+                
+                <div class="error" id="error"></div>
+                <div class="success" id="success"></div>
+                
+                <form id="formulario">
+                    <div class="form-group">
+                        <label for="a">Factor de crecimiento (a)</label>
+                        <input type="number" id="a" name="a" value="0.5" step="0.1" required>
+                        <div class="help-text">Determina la tasa de crecimiento de la cola</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="t0">Tiempo inicial (t₀)</label>
+                        <input type="number" id="t0" name="t0" value="1" step="0.1" min="0.1" required>
+                        <div class="help-text">Debe ser mayor que 0</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="q0">Cola inicial (q₀)</label>
+                        <input type="number" id="q0" name="q0" value="5" step="0.1" required>
+                        <div class="help-text">Solicitudes pendientes al inicio</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="tf">Tiempo final (tₓ)</label>
+                        <input type="number" id="tf" name="tf" value="10" step="0.1" required>
+                        <div class="help-text">Debe ser mayor que t₀</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="paso">Paso de tiempo</label>
+                        <input type="number" id="paso" name="paso" value="0.5" step="0.1" min="0.1" required>
+                        <div class="help-text">Incremento entre cálculos</div>
+                    </div>
+                    
+                    <button type="submit" id="btnCalcular">Calcular</button>
+                </form>
+            </div>
+            
+            <!-- Resultados -->
+            <div class="results-section">
+                <h2>Resultados</h2>
+                
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Calculando...</p>
+                </div>
+                
+                <div id="resultados" style="display: none;">
+                    <img id="grafica" class="grafica" alt="Gráfica de resultados">
+                    
+                    <div class="stats">
+                        <div class="stat-box">
+                            <div class="stat-label">Máximo de q(t)</div>
+                            <div class="stat-value" id="qmax">-</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">Mínimo de q(t)</div>
+                            <div class="stat-value" id="qmin">-</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">Promedio de q(t)</div>
+                            <div class="stat-value" id="qprom">-</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">Puntos calculados</div>
+                            <div class="stat-value" id="puntos">-</div>
+                        </div>
+                    </div>
+                    
+                    <div class="tabla-datos">
+                        <table id="tablaDatos">
+                            <thead>
+                                <tr>
+                                    <th>Tiempo (t)</th>
+                                    <th>Cola q(t)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cuerpoTabla"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const formulario = document.getElementById('formulario');
+        const btnCalcular = document.getElementById('btnCalcular');
+        const loading = document.getElementById('loading');
+        const resultados = document.getElementById('resultados');
+        const errorDiv = document.getElementById('error');
+        const successDiv = document.getElementById('success');
+        
+        formulario.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Limpiar mensajes
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            
+            // Obtener valores
+            const datos = {
+                a: parseFloat(document.getElementById('a').value),
+                t0: parseFloat(document.getElementById('t0').value),
+                q0: parseFloat(document.getElementById('q0').value),
+                tf: parseFloat(document.getElementById('tf').value),
+                paso: parseFloat(document.getElementById('paso').value)
+            };
+            
+            // Mostrar loading
+            loading.style.display = 'block';
+            resultados.style.display = 'none';
+            btnCalcular.disabled = true;
+            
+            try {
+                const response = await fetch('/calcular', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(datos)
+                });
+                
+                const resultado = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(resultado.error || 'Error en el cálculo');
+                }
+                
+                // Mostrar gráfica
+                document.getElementById('grafica').src = 'data:image/png;base64,' + resultado.imagen;
+                
+                // Mostrar estadísticas
+                document.getElementById('qmax').textContent = resultado.q_max;
+                document.getElementById('qmin').textContent = resultado.q_min;
+                document.getElementById('qprom').textContent = resultado.q_promedio;
+                document.getElementById('puntos').textContent = resultado.puntos;
+                
+                // Llenar tabla
+                const cuerpoTabla = document.getElementById('cuerpoTabla');
+                cuerpoTabla.innerHTML = '';
+                
+                for (let i = 0; i < resultado.tiempos.length; i++) {
+                    const fila = document.createElement('tr');
+                    fila.innerHTML = `
+                        <td>${resultado.tiempos[i]}</td>
+                        <td>${resultado.colas[i]}</td>
+                    `;
+                    cuerpoTabla.appendChild(fila);
+                }
+                
+                // Mostrar resultados
+                loading.style.display = 'none';
+                resultados.style.display = 'block';
+                successDiv.style.display = 'block';
+                successDiv.textContent = '✓ Cálculo completado exitosamente';
+                
+            } catch (error) {
+                errorDiv.style.display = 'block';
+                errorDiv.textContent = '✗ Error: ' + error.message;
+                loading.style.display = 'none';
+            } finally {
+                btnCalcular.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
