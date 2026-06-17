@@ -201,7 +201,7 @@ with st.sidebar:
             )
     
     st.divider()
-    calcular_btn = st.button("🚀 Calcular", use_container_width=True, type="primary")
+    calcular_btn = st.button("🚀 Calcular", width="stretch", type="primary")
 
 # CÁLCULO Y VISUALIZACIÓN
 if calcular_btn:
@@ -258,7 +258,7 @@ if calcular_btn:
                 
                 col1, col2 = st.columns([3, 1])
                 with col1:
-                    st.dataframe(df, use_container_width=True, height=300)
+                    st.dataframe(df, width="stretch", height=300)
                 with col2:
                     csv = df.to_csv(index=False)
                     st.download_button(
