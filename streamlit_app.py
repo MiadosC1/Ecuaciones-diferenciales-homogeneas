@@ -1,8 +1,12 @@
 import streamlit as st
 import math
-import matplotlib.pyplot as plt
 import pandas as pd
 from abc import ABC, abstractmethod
+
+try:
+    import matplotlib.pyplot as plt
+except Exception:
+    plt = None
 
 # Configuración de la página
 st.set_page_config(
@@ -130,6 +134,27 @@ def calcular(tipo_eq, **params):
     
     return tiempos, valores, ecuacion
 
+
+def mostrar_grafica(tiempos, valores, eq):
+    df_grafica = pd.DataFrame({
+        'Tiempo (t)': tiempos,
+        eq.eje_y: valores
+    })
+
+    if plt is not None:
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.plot(tiempos, valores, marker="o", linestyle="-",
+                linewidth=2, color=eq.color, markersize=6, label=eq.eje_y)
+        ax.set_xlabel("Tiempo (t)", fontsize=12)
+        ax.set_ylabel(eq.eje_y, fontsize=12)
+        ax.set_title(f"{eq.nombre}: {eq.ecuacion}", fontsize=14, fontweight='bold')
+        ax.grid(True, alpha=0.3)
+        ax.legend(fontsize=10)
+        st.pyplot(fig)
+        plt.close(fig)
+    else:
+        st.line_chart(df_grafica.set_index('Tiempo (t)'))
+
 # INTERFAZ PRINCIPAL
 st.title("📊 Simulador de Ecuaciones Diferenciales")
 st.markdown("Visualiza y resuelve diferentes ecuaciones diferenciales de forma interactiva")
@@ -223,15 +248,7 @@ if calcular_btn:
                 
                 # Gráfica
                 with col1:
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    ax.plot(tiempos, valores, marker="o", linestyle="-", 
-                           linewidth=2, color=eq.color, markersize=6, label=eq.eje_y)
-                    ax.set_xlabel("Tiempo (t)", fontsize=12)
-                    ax.set_ylabel(eq.eje_y, fontsize=12)
-                    ax.set_title(f"{eq.nombre}: {eq.ecuacion}", fontsize=14, fontweight='bold')
-                    ax.grid(True, alpha=0.3)
-                    ax.legend(fontsize=10)
-                    st.pyplot(fig)
+                    mostrar_grafica(tiempos, valores, eq)
                 
                 # Estadísticas
                 with col2:
