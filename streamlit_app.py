@@ -1,291 +1,279 @@
-import streamlit as st
 import math
+import importlib
+import math
+
 import pandas as pd
-from abc import ABC, abstractmethod
+import streamlit as st
 
 try:
-    import matplotlib.pyplot as plt
+    go = importlib.import_module("plotly.graph_objects")
 except Exception:
-    plt = None
+    go = None
 
-# Configuración de la página
+
 st.set_page_config(
     page_title="Ecuaciones Diferenciales",
-    page_icon="📊",
-    layout="wide"
+    page_icon="📈",
+    layout="wide",
 )
 
-# ============================================
-# SISTEMA MODULAR DE ECUACIONES DIFERENCIALES
-# ============================================
 
-class EcuacionDiferencial(ABC):
-    """Clase base para ecuaciones diferenciales"""
-    
-    def __init__(self, nombre, ecuacion, parametros, eje_y="y(t)", color="blue"):
-        self.nombre = nombre
-        self.ecuacion = ecuacion
-        self.parametros = parametros
-        self.eje_y = eje_y
-        self.color = color
-    
-    @abstractmethod
-    def calcular_solucion(self, t, **params):
-        pass
-
-# ECUACIONES DISPONIBLES
-
-class ColaDiferencial(EcuacionDiferencial):
-    def __init__(self):
-        super().__init__(
-            nombre="Cola de Solicitudes",
-            ecuacion="dq/dt = a + q/t",
-            parametros=['a', 't0', 'q0', 'tf', 'paso'],
-            eje_y="Cola q(t)",
-            color="#1f77b4"
-        )
-    
-    def calcular_solucion(self, t, a, t0, q0, **kwargs):
-        C = (q0 / t0) - a * math.log(t0)
-        return t * (a * math.log(t) + C)
-
-class CrecimientoExponencial(EcuacionDiferencial):
-    def __init__(self):
-        super().__init__(
-            nombre="Crecimiento Exponencial",
-            ecuacion="dy/dt = ky",
-            parametros=['k', 't0', 'y0', 'tf', 'paso'],
-            eje_y="y(t)",
-            color="#2ca02c"
-        )
-    
-    def calcular_solucion(self, t, k, t0, y0, **kwargs):
-        return y0 * math.exp(k * (t - t0))
-
-class EnfriamientoNewton(EcuacionDiferencial):
-    def __init__(self):
-        super().__init__(
-            nombre="Enfriamiento de Newton",
-            ecuacion="dy/dt = -k(y - T)",
-            parametros=['k', 'T', 't0', 'y0', 'tf', 'paso'],
-            eje_y="Temperatura y(t)",
-            color="#d62728"
-        )
-    
-    def calcular_solucion(self, t, k, T, t0, y0, **kwargs):
-        return T + (y0 - T) * math.exp(-k * (t - t0))
-
-class EcuacionLogistica(EcuacionDiferencial):
-    def __init__(self):
-        super().__init__(
-            nombre="Ecuación Logística",
-            ecuacion="dy/dt = ry(1 - y/K)",
-            parametros=['r', 'K', 't0', 'y0', 'tf', 'paso'],
-            eje_y="Población y(t)",
-            color="#9467bd"
-        )
-    
-    def calcular_solucion(self, t, r, K, t0, y0, **kwargs):
-        exp_term = math.exp(-r * (t - t0)) * (K - y0) / y0
-        return K / (1 + exp_term)
-
-class CircuitoRC(EcuacionDiferencial):
-    def __init__(self):
-        super().__init__(
-            nombre="Circuito RC",
-            ecuacion="dV/dt = -V/(RC)",
-            parametros=['R', 'C', 't0', 'V0', 'tf', 'paso'],
-            eje_y="Voltaje V(t)",
-            color="#ff7f0e"
-        )
-    
-    def calcular_solucion(self, t, R, C, t0, V0, **kwargs):
-        tau = R * C
-        return V0 * math.exp(-(t - t0) / tau)
-
-# Registro de ecuaciones
-ECUACIONES = {
-    'cola': ColaDiferencial(),
-    'exponencial': CrecimientoExponencial(),
-    'newton': EnfriamientoNewton(),
-    'logistica': EcuacionLogistica(),
-    'rc': CircuitoRC()
-}
-
-def calcular(tipo_eq, **params):
-    """Calcula la solución de una ecuación"""
-    ecuacion = ECUACIONES[tipo_eq]
-    t0 = params['t0']
-    tf = params['tf']
-    paso = params['paso']
-    
+def calcular_cola(a, t0, q0, tf, paso):
     tiempos = []
     valores = []
-    
     t = t0
+
     while t <= tf:
-        try:
-            valor = ecuacion.calcular_solucion(t, **params)
-            tiempos.append(round(t, 4))
-            valores.append(round(valor, 4))
-        except:
+        if t <= 0:
+            t += paso
             continue
+
+        c = (q0 / t0) - a * math.log(t0)
+        valor = t * (a * math.log(t) + c)
+        tiempos.append(round(t, 4))
+        valores.append(round(valor, 4))
         t += paso
-    
-    return tiempos, valores, ecuacion
+
+    return tiempos, valores
 
 
-def mostrar_grafica(tiempos, valores, eq):
-    df_grafica = pd.DataFrame({
-        'Tiempo (t)': tiempos,
-        eq.eje_y: valores
-    })
+def calcular_constantes(alpha, omega, x0, dx0):
+    if alpha >= omega:
+        return None
 
-    if plt is not None:
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.plot(tiempos, valores, marker="o", linestyle="-",
-                linewidth=2, color=eq.color, markersize=6, label=eq.eje_y)
-        ax.set_xlabel("Tiempo (t)", fontsize=12)
-        ax.set_ylabel(eq.eje_y, fontsize=12)
-        ax.set_title(f"{eq.nombre}: {eq.ecuacion}", fontsize=14, fontweight='bold')
-        ax.grid(True, alpha=0.3)
-        ax.legend(fontsize=10)
-        st.pyplot(fig)
-        plt.close(fig)
-    else:
-        st.line_chart(df_grafica.set_index('Tiempo (t)'))
+    beta = math.sqrt(omega ** 2 - alpha ** 2)
+    c1 = x0
+    c2 = (dx0 + alpha * x0) / beta
+    return c1, c2, beta
 
-# INTERFAZ PRINCIPAL
-st.title("📊 Simulador de Ecuaciones Diferenciales")
-st.markdown("Visualiza y resuelve diferentes ecuaciones diferenciales de forma interactiva")
 
-# Sidebar con selección
-with st.sidebar:
-    st.header("⚙️ Configuración")
-    
-    tipo_ecuacion = st.selectbox(
-        "Selecciona una ecuación:",
-        options=list(ECUACIONES.keys()),
-        format_func=lambda x: ECUACIONES[x].nombre
+def generar_puntos(alpha, omega, x0, dx0, t_max, n_puntos=20):
+    constantes = calcular_constantes(alpha, omega, x0, dx0)
+    if constantes is None:
+        return None
+
+    c1, c2, beta = constantes
+    tiempos = [i * t_max / (n_puntos - 1) for i in range(n_puntos)]
+    valores = [math.exp(-alpha * t) * (c1 * math.cos(beta * t) + c2 * math.sin(beta * t)) for t in tiempos]
+    return tiempos, valores, c1, c2, beta
+
+
+def crear_figura_lineas(series, titulo, y_title):
+    figura = go.Figure()
+    colores = ["#1f77b4", "#ff7f0e", "#2ca02c"]
+
+    for indice, serie in enumerate(series):
+        figura.add_trace(
+            go.Scatter(
+                x=serie["x"],
+                y=serie["y"],
+                mode="lines+markers",
+                name=serie["name"],
+                line=dict(color=colores[indice % len(colores)], width=3),
+                marker=dict(size=6),
+            )
+        )
+
+    figura.update_layout(
+        title=titulo,
+        xaxis_title="Tiempo (t)",
+        yaxis_title=y_title,
+        template="plotly_white",
+        height=520,
+        margin=dict(l=20, r=20, t=60, b=20),
+        legend_title="Series",
     )
-    
-    ecuacion_actual = ECUACIONES[tipo_ecuacion]
-    
-    st.markdown(f"**Ecuación:** `{ecuacion_actual.ecuacion}`")
-    st.markdown(f"**Eje Y:** {ecuacion_actual.eje_y}")
-    st.divider()
-    
-    # Parámetros dinámicos
-    params = {}
-    labels = {
-        'a': 'Factor de crecimiento (a)',
-        'k': 'Constante de decaimiento (k)',
-        'K': 'Capacidad máxima (K)',
-        'r': 'Tasa de crecimiento (r)',
-        'R': 'Resistencia (R) Ω',
-        'C': 'Capacitancia (C) F',
-        'T': 'Temperatura ambiente (T)',
-        't0': 'Tiempo inicial (t₀)',
-        'y0': 'Valor inicial (y₀)',
-        'q0': 'Cola inicial (q₀)',
-        'V0': 'Voltaje inicial (V₀)',
-        'tf': 'Tiempo final (tₓ)',
-        'paso': 'Paso de tiempo'
-    }
-    
-    defaults = {
-        'cola': {'a': 0.5, 't0': 1, 'q0': 5, 'tf': 10, 'paso': 0.5},
-        'exponencial': {'k': 0.3, 't0': 0, 'y0': 1, 'tf': 10, 'paso': 0.5},
-        'newton': {'k': 0.1, 'T': 20, 't0': 0, 'y0': 100, 'tf': 50, 'paso': 1},
-        'logistica': {'r': 0.3, 'K': 1000, 't0': 0, 'y0': 10, 'tf': 30, 'paso': 0.5},
-        'rc': {'R': 1000, 'C': 0.001, 't0': 0, 'V0': 10, 'tf': 5, 'paso': 0.1}
-    }
-    
-    default_vals = defaults.get(tipo_ecuacion, {})
-    
-    for param in ecuacion_actual.parametros:
-        # Streamlit requires all numeric args (value/step/min/max) to share type.
-        if param in ['paso']:
-            params[param] = st.number_input(
-                labels[param],
-                value=float(default_vals.get(param, 0.5)),
-                step=0.01,
-                min_value=0.01
-            )
-        elif param in ['t0', 'y0', 'q0', 'V0']:
-            params[param] = st.number_input(
-                labels[param],
-                value=float(default_vals.get(param, 0.0)),
-                step=0.1
-            )
-        else:
-            params[param] = st.number_input(
-                labels[param],
-                value=float(default_vals.get(param, 1.0)),
-                step=0.1
-            )
-    
-    st.divider()
-    calcular_btn = st.button("🚀 Calcular", width="stretch", type="primary")
+    return figura
 
-# CÁLCULO Y VISUALIZACIÓN
-if calcular_btn:
-    try:
-        # Validaciones
-        if params['t0'] <= 0 or params['tf'] <= 0:
-            st.error("❌ El tiempo inicial y final deben ser mayores que 0")
-        elif params['t0'] > params['tf']:
-            st.error("❌ El tiempo inicial debe ser menor que el final")
-        elif params['paso'] <= 0:
-            st.error("❌ El paso debe ser mayor que 0")
-        else:
-            # Calcular
-            tiempos, valores, eq = calcular(tipo_ecuacion, **params)
-            
-            if valores:
-                # Crear columnas
-                col1, col2 = st.columns(2)
-                
-                # Gráfica
-                with col1:
-                    mostrar_grafica(tiempos, valores, eq)
-                
-                # Estadísticas
-                with col2:
-                    valor_max = max(valores)
-                    valor_min = min(valores)
-                    valor_prom = sum(valores) / len(valores)
-                    
-                    st.subheader("📈 Estadísticas")
-                    
-                    col_stat1, col_stat2 = st.columns(2)
-                    with col_stat1:
-                        st.metric("Máximo", f"{valor_max:.4f}")
-                        st.metric("Mínimo", f"{valor_min:.4f}")
-                    with col_stat2:
-                        st.metric("Promedio", f"{valor_prom:.4f}")
-                        st.metric("Puntos", len(valores))
-                
-                # Tabla de datos
-                st.subheader("📋 Datos Calculados")
-                df = pd.DataFrame({
-                    'Tiempo (t)': tiempos,
-                    eq.eje_y: valores
-                })
-                
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.dataframe(df, width="stretch", height=300)
-                with col2:
-                    csv = df.to_csv(index=False)
-                    st.download_button(
-                        label="📥 Descargar CSV",
-                        data=csv,
-                        file_name=f"{tipo_ecuacion}_datos.csv",
-                        mime="text/csv"
-                    )
-            else:
-                st.error("❌ No se pudieron calcular valores válidos")
-    
-    except Exception as e:
-        st.error(f"❌ Error: {str(e)}")
+
+st.title("Simulador de Ecuaciones Diferenciales")
+st.markdown("Elige entre la cola de solicitudes y la EDO de segundo orden para control de carga en servidor.")
+
+with st.sidebar:
+    st.header("Configuración")
+    modo = st.selectbox(
+        "Tipo de simulación",
+        options=["Cola de solicitudes", "Control de carga con EDO de orden 2"],
+    )
+
+if modo == "Cola de solicitudes":
+    st.subheader("Cola de Solicitudes")
+    st.markdown("Modelo: $dq/dt = a + q/t$ y solución cerrada $q(t) = t(a\ln(t) + C)$.")
+
+    with st.sidebar:
+        a = st.slider("a", min_value=0.01, max_value=5.0, value=0.5, step=0.01)
+        t0 = st.slider("t0", min_value=0.1, max_value=10.0, value=1.0, step=0.1)
+        q0 = st.slider("q0", min_value=0.0, max_value=100.0, value=5.0, step=0.5)
+        tf = st.slider("tf", min_value=0.2, max_value=20.0, value=10.0, step=0.1)
+        paso = st.slider("paso", min_value=0.05, max_value=2.0, value=0.5, step=0.05)
+
+    if t0 >= tf:
+        st.warning("El tiempo inicial debe ser menor que el tiempo final.")
+        st.stop()
+
+    tiempos, valores = calcular_cola(a, t0, q0, tf, paso)
+    if not tiempos:
+        st.warning("No se pudieron generar puntos válidos para la cola de solicitudes.")
+        st.stop()
+
+    c = (q0 / t0) - a * math.log(t0)
+    fig = crear_figura_lineas(
+        [{"x": tiempos, "y": valores, "name": "Cola q(t)"}],
+        "Cola de solicitudes q(t)",
+        "Cola q(t)",
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.metric("Constante C", f"{c:.4f}")
+    tabla = pd.DataFrame({"t": tiempos, "q(t)": valores})
+    st.subheader("Tabla de puntos")
+    st.dataframe(tabla, use_container_width=True, height=360)
+
+else:
+    st.subheader("Control de carga en servidor")
+    st.markdown(
+        "Modelo: $x''(t) + 2\alpha x'(t) + \omega^2 x(t) = 0$. Se valida el caso subamortiguado con $\alpha < \omega$."
+    )
+
+    defaults = [
+        {"alpha": 0.5, "omega": 2.0, "x0": 1.0, "dx0": 0.0, "t_max": 10.0},
+        {"alpha": 0.35, "omega": 2.4, "x0": 0.8, "dx0": 0.6, "t_max": 12.0},
+        {"alpha": 0.7, "omega": 2.8, "x0": 1.2, "dx0": -0.2, "t_max": 9.0},
+    ]
+
+    escenarios = []
+
+    with st.sidebar:
+        cantidad_escenarios = st.slider("Escenarios a comparar", min_value=1, max_value=3, value=1)
+        st.caption("Ajusta hasta 3 escenarios y compáralos en una sola gráfica.")
+
+        for indice in range(cantidad_escenarios):
+            configuracion = defaults[indice]
+            with st.expander(f"Escenario {indice + 1}", expanded=indice == 0):
+                alpha = st.slider(
+                    "alpha",
+                    min_value=0.0,
+                    max_value=5.0,
+                    value=float(configuracion["alpha"]),
+                    step=0.05,
+                    key=f"alpha_{indice}",
+                )
+                omega = st.slider(
+                    "omega",
+                    min_value=0.1,
+                    max_value=6.0,
+                    value=float(configuracion["omega"]),
+                    step=0.05,
+                    key=f"omega_{indice}",
+                )
+                x0 = st.slider(
+                    "x0",
+                    min_value=-50.0,
+                    max_value=50.0,
+                    value=float(configuracion["x0"]),
+                    step=0.1,
+                    key=f"x0_{indice}",
+                )
+                dx0 = st.slider(
+                    "dx0",
+                    min_value=-50.0,
+                    max_value=50.0,
+                    value=float(configuracion["dx0"]),
+                    step=0.1,
+                    key=f"dx0_{indice}",
+                )
+                t_max = st.slider(
+                    "t_max",
+                    min_value=1.0,
+                    max_value=30.0,
+                    value=float(configuracion["t_max"]),
+                    step=0.5,
+                    key=f"tmax_{indice}",
+                )
+
+            escenarios.append(
+                {
+                    "nombre": f"Escenario {indice + 1}",
+                    "alpha": alpha,
+                    "omega": omega,
+                    "x0": x0,
+                    "dx0": dx0,
+                    "t_max": t_max,
+                }
+            )
+
+    escenarios_validos = []
+    for escenario in escenarios:
+        resultado = generar_puntos(
+            escenario["alpha"],
+            escenario["omega"],
+            escenario["x0"],
+            escenario["dx0"],
+            escenario["t_max"],
+        )
+
+        if resultado is None:
+            st.warning(
+                f"{escenario['nombre']}: alpha ({escenario['alpha']:.2f}) debe ser menor que omega ({escenario['omega']:.2f}) para mantener el régimen subamortiguado."
+            )
+            continue
+
+        tiempos, valores, c1, c2, beta = resultado
+        escenarios_validos.append(
+            {
+                **escenario,
+                "tiempos": tiempos,
+                "valores": valores,
+                "c1": c1,
+                "c2": c2,
+                "beta": beta,
+            }
+        )
+
+    if not escenarios_validos:
+        st.stop()
+
+    escenario_activo_nombre = st.selectbox(
+        "Escenario para revisar la tabla y los parámetros",
+        options=[escenario["nombre"] for escenario in escenarios_validos],
+    )
+    escenario_activo = next(
+        escenario for escenario in escenarios_validos if escenario["nombre"] == escenario_activo_nombre
+    )
+
+    columna_1, columna_2, columna_3 = st.columns(3)
+    with columna_1:
+        st.metric("C1", f"{escenario_activo['c1']:.4f}")
+    with columna_2:
+        st.metric("C2", f"{escenario_activo['c2']:.4f}")
+    with columna_3:
+        st.metric("beta", f"{escenario_activo['beta']:.4f}")
+
+    st.markdown(
+        f"**Ecuación:** $x(t) = e^{{-\alpha t}}\,\left(C_1 \cos(\beta t) + C_2 \sin(\beta t)\right)$"
+        f"  \\ **Escenario activo:** $\alpha = {escenario_activo['alpha']:.2f}$, $\omega = {escenario_activo['omega']:.2f}$, "
+        f"$x_0 = {escenario_activo['x0']:.2f}$, $\dot x_0 = {escenario_activo['dx0']:.2f}$"
+    )
+
+    figura = crear_figura_lineas(
+        [
+            {"x": escenario["tiempos"], "y": escenario["valores"], "name": escenario["nombre"]}
+            for escenario in escenarios_validos
+        ],
+        "Respuesta subamortiguada x(t)",
+        "Desplazamiento x(t)",
+    )
+    st.plotly_chart(figura, use_container_width=True)
+
+    st.subheader("Tabla de 20 puntos")
+    tabla = pd.DataFrame(
+        {
+            "t": [round(valor, 4) for valor in escenario_activo["tiempos"]],
+            "x(t)": [round(valor, 4) for valor in escenario_activo["valores"]],
+        }
+    )
+    st.dataframe(tabla, use_container_width=True, height=360)
+
+    st.caption(
+        "Si comparas varios escenarios, la gráfica superpone sus respuestas y la tabla muestra el escenario seleccionado."
+    )
