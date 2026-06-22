@@ -58,10 +58,12 @@ def generar_puntos(alpha, omega, x0, dx0, t_max, n_puntos=20):
 
 
 def crear_figura_lineas(series, titulo, y_title):
-    if go is None:
+    try:
+        go_local = importlib.import_module("plotly.graph_objects")
+    except Exception:
         return None
 
-    figura = go.Figure()
+    figura = go_local.Figure()
     colores = ["#1f77b4", "#ff7f0e", "#2ca02c"]
 
     for indice, serie in enumerate(series):
