@@ -1,4 +1,3 @@
-import math
 import importlib
 import math
 
@@ -59,6 +58,9 @@ def generar_puntos(alpha, omega, x0, dx0, t_max, n_puntos=20):
 
 
 def crear_figura_lineas(series, titulo, y_title):
+    if go is None:
+        return None
+
     figura = go.Figure()
     colores = ["#1f77b4", "#ff7f0e", "#2ca02c"]
 
@@ -122,7 +124,10 @@ if modo == "Cola de solicitudes":
         "Cola de solicitudes q(t)",
         "Cola q(t)",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    if fig is None:
+        st.line_chart(pd.DataFrame({"t": tiempos, "q(t)": valores}).set_index("t"), use_container_width=True)
+    else:
+        st.plotly_chart(fig, use_container_width=True)
 
     st.metric("Constante C", f"{c:.4f}")
     tabla = pd.DataFrame({"t": tiempos, "q(t)": valores})
@@ -263,7 +268,12 @@ else:
         "Respuesta subamortiguada x(t)",
         "Desplazamiento x(t)",
     )
-    st.plotly_chart(figura, use_container_width=True)
+    if figura is None:
+        grafica = pd.DataFrame({escenario["nombre"]: escenario["valores"] for escenario in escenarios_validos})
+        grafica.insert(0, "t", escenarios_validos[0]["tiempos"])
+        st.line_chart(grafica.set_index("t"), use_container_width=True)
+    else:
+        st.plotly_chart(figura, use_container_width=True)
 
     st.subheader("Tabla de 20 puntos")
     tabla = pd.DataFrame(
