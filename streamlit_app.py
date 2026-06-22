@@ -257,9 +257,9 @@ else:
         st.metric("beta", f"{escenario_activo['beta']:.4f}")
 
     st.markdown(
-        f"**Ecuación:** $x(t) = e^{{-\alpha t}}\,\left(C_1 \cos(\beta t) + C_2 \sin(\beta t)\right)$"
-        f"  \\ **Escenario activo:** $\alpha = {escenario_activo['alpha']:.2f}$, $\omega = {escenario_activo['omega']:.2f}$, "
-        f"$x_0 = {escenario_activo['x0']:.2f}$, $\dot x_0 = {escenario_activo['dx0']:.2f}$"
+        f"**Ecuación:** $x(t) = e^{{-\\alpha t}}\\left(C_1 \\cos(\\beta t) + C_2 \\sin(\\beta t)\\right)$\n\n"
+        f"**Escenario activo:** $\\alpha = {escenario_activo['alpha']:.2f}$, $\\omega = {escenario_activo['omega']:.2f}$, "
+        f"$x_0 = {escenario_activo['x0']:.2f}$, $\\dot x_0 = {escenario_activo['dx0']:.2f}$"
     )
 
     figura = crear_figura_lineas(
