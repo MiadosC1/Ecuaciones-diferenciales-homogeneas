@@ -139,7 +139,7 @@ if modo == "Cola de solicitudes":
 else:
     st.subheader("Control de carga en servidor")
     st.markdown(
-        "Modelo: $x''(t) + 2\alpha x'(t) + \omega^2 x(t) = 0$. Se valida el caso subamortiguado con $\alpha < \omega$."
+        r"Modelo: $x''(t) + 2\alpha x'(t) + \omega^2 x(t) = 0$. Se valida el caso subamortiguado con $\alpha < \omega$."
     )
 
     defaults = [
