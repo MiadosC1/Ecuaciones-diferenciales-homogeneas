@@ -5,6 +5,19 @@ import pandas as pd
 import streamlit as st
 
 try:
+    import sympy as sp
+    from sympy.parsing.sympy_parser import (
+        implicit_multiplication_application,
+        parse_expr,
+        standard_transformations,
+    )
+except Exception:
+    sp = None
+    parse_expr = None
+    standard_transformations = None
+    implicit_multiplication_application = None
+
+try:
     go = importlib.import_module("plotly.graph_objects")
 except Exception:
     go = None
@@ -17,18 +30,19 @@ st.set_page_config(
 )
 
 
-def calcular_cola(a, t0, q0, tf, paso):
+TRANSFORMACIONES_LAPLACE = None
+if parse_expr is not None:
+    TRANSFORMACIONES_LAPLACE = standard_transformations + (implicit_multiplication_application,)
+
+
+def calcular_api_rest(y0, tf, paso, tasa_llegada=12.0, capacidad=3.0):
     tiempos = []
     valores = []
-    t = t0
+    t = 0.0
+    equilibrio = tasa_llegada / capacidad
 
     while t <= tf:
-        if t <= 0:
-            t += paso
-            continue
-
-        c = (q0 / t0) - a * math.log(t0)
-        valor = t * (a * math.log(t) + c)
+        valor = equilibrio + (y0 - equilibrio) * math.exp(-capacidad * t)
         tiempos.append(round(t, 4))
         valores.append(round(valor, 4))
         t += paso
@@ -90,53 +104,142 @@ def crear_figura_lineas(series, titulo, y_title):
     return figura
 
 
+def _simbolos_laplace():
+    if sp is None:
+        return None
+
+    t, s = sp.symbols("t s", positive=True, real=True)
+    locales = {
+        "t": t,
+        "s": s,
+        "e": sp.E,
+        "E": sp.E,
+        "pi": sp.pi,
+        "oo": sp.oo,
+        "Heaviside": sp.Heaviside,
+        "sin": sp.sin,
+        "cos": sp.cos,
+        "tan": sp.tan,
+        "exp": sp.exp,
+        "log": sp.log,
+        "sqrt": sp.sqrt,
+        "Abs": sp.Abs,
+    }
+    return t, s, locales
+
+
+def resolver_laplace_directa(expresion_texto):
+    simbolos = _simbolos_laplace()
+    if simbolos is None:
+        return None, None, "La dependencia sympy no está disponible en este entorno."
+
+    t, s, locales = simbolos
+    try:
+        expresion = parse_expr(
+            expresion_texto,
+            local_dict=locales,
+            transformations=TRANSFORMACIONES_LAPLACE,
+            evaluate=True,
+        )
+    except Exception as error:
+        return None, None, f"No se pudo interpretar f(t): {error}"
+
+    try:
+        transformada = sp.laplace_transform(expresion, t, s, noconds=True)
+    except Exception as error:
+        return expresion, None, f"No se pudo calcular la transformada: {error}"
+
+    return expresion, transformada, None
+
+
+def resolver_laplace_inversa(expresion_texto):
+    simbolos = _simbolos_laplace()
+    if simbolos is None:
+        return None, None, "La dependencia sympy no está disponible en este entorno."
+
+    t, s, locales = simbolos
+    try:
+        expresion = parse_expr(
+            expresion_texto,
+            local_dict=locales,
+            transformations=TRANSFORMACIONES_LAPLACE,
+            evaluate=True,
+        )
+    except Exception as error:
+        return None, None, f"No se pudo interpretar F(s): {error}"
+
+    try:
+        inversa = sp.inverse_laplace_transform(expresion, s, t)
+    except Exception as error:
+        return expresion, None, f"No se pudo calcular la transformada inversa: {error}"
+
+    return expresion, inversa, None
+
+
 st.title("Simulador de Ecuaciones Diferenciales")
-st.markdown("Elige entre la cola de solicitudes y la EDO de segundo orden para control de carga en servidor.")
+st.markdown("Elige entre el procesamiento de solicitudes en una API REST, la EDO de segundo orden y la transformada de Laplace.")
 
 with st.sidebar:
     st.header("Configuración")
     modo = st.selectbox(
         "Tipo de simulación",
-        options=["Cola de solicitudes", "Control de carga con EDO de orden 2"],
+        options=["Procesamiento de solicitudes en una API REST", "Control de carga con EDO de orden 2", "Transformada de Laplace"],
     )
 
-if modo == "Cola de solicitudes":
-    st.subheader("Cola de Solicitudes")
-    st.markdown("Modelo: $dq/dt = a + q/t$ y solución cerrada $q(t) = t(a\ln(t) + C)$.")
+if modo == "Procesamiento de solicitudes en una API REST":
+    st.subheader("Procesamiento de solicitudes en una API REST")
+    st.markdown(
+        """
+        Una API REST expone endpoints HTTP para recibir, procesar y responder solicitudes.
+
+        **Variables del sistema**
+        - Variable dependiente: $y(t)$, número de solicitudes en cola en el instante $t$.
+        - Variable independiente: $t$, tiempo transcurrido desde el inicio.
+        - Parámetros: tasa de llegada $\lambda$, capacidad de procesamiento $\mu$ y condición inicial $y(0)$.
+
+        **Modelo diferencial**
+        - Se usa la ecuación $y'(t) + 3y(t) = 12$ para representar la dinámica de carga.
+        - El término $3y(t)$ modela la capacidad de procesamiento proporcional al estado actual.
+        - El término $12$ representa la llegada constante de solicitudes.
+        - La solución estacionaria es $y^* = 4$.
+        """
+    )
 
     with st.sidebar:
-        a = st.slider("a", min_value=0.01, max_value=5.0, value=0.5, step=0.01)
-        t0 = st.slider("t0", min_value=0.1, max_value=10.0, value=1.0, step=0.1)
-        q0 = st.slider("q0", min_value=0.0, max_value=100.0, value=5.0, step=0.5)
-        tf = st.slider("tf", min_value=0.2, max_value=20.0, value=10.0, step=0.1)
+        y0 = st.slider("y(0)", min_value=0.0, max_value=100.0, value=2.0, step=0.5)
+        tf = st.slider("tf", min_value=0.5, max_value=20.0, value=10.0, step=0.5)
         paso = st.slider("paso", min_value=0.05, max_value=2.0, value=0.5, step=0.05)
 
-    if t0 >= tf:
-        st.warning("El tiempo inicial debe ser menor que el tiempo final.")
-        st.stop()
-
-    tiempos, valores = calcular_cola(a, t0, q0, tf, paso)
+    tiempos, valores = calcular_api_rest(y0, tf, paso)
     if not tiempos:
-        st.warning("No se pudieron generar puntos válidos para la cola de solicitudes.")
+        st.warning("No se pudieron generar puntos válidos para el procesamiento de solicitudes.")
         st.stop()
 
-    c = (q0 / t0) - a * math.log(t0)
     fig = crear_figura_lineas(
-        [{"x": tiempos, "y": valores, "name": "Cola q(t)"}],
-        "Cola de solicitudes q(t)",
-        "Cola q(t)",
+        [{"x": tiempos, "y": valores, "name": "Solicitudes en cola y(t)"}],
+        "Procesamiento de solicitudes en una API REST",
+        "Solicitudes en cola y(t)",
     )
     if fig is None:
-        st.line_chart(pd.DataFrame({"t": tiempos, "q(t)": valores}).set_index("t"), use_container_width=True)
+        st.line_chart(pd.DataFrame({"t": tiempos, "y(t)": valores}).set_index("t"), use_container_width=True)
     else:
         st.plotly_chart(fig, use_container_width=True)
 
-    st.metric("Constante C", f"{c:.4f}")
-    tabla = pd.DataFrame({"t": tiempos, "q(t)": valores})
+    columna_1, columna_2, columna_3 = st.columns(3)
+    with columna_1:
+        st.metric("Tasa de llegada λ", "12.0")
+    with columna_2:
+        st.metric("Capacidad μ", "3.0")
+    with columna_3:
+        st.metric("Estado estacionario", "4.0")
+
+    st.markdown(f"**Solución cerrada:** $y(t) = 4 + ({y0:.2f} - 4)e^{{-3t}}$")
+
+    tabla = pd.DataFrame({"t": tiempos, "y(t)": valores})
     st.subheader("Tabla de puntos")
     st.dataframe(tabla, use_container_width=True, height=360)
 
-else:
+elif modo == "Control de carga con EDO de orden 2":
     st.subheader("Control de carga en servidor")
     st.markdown(
         r"Modelo: $x''(t) + 2\alpha x'(t) + \omega^2 x(t) = 0$. Se valida el caso subamortiguado con $\alpha < \omega$."
@@ -289,3 +392,50 @@ else:
     st.caption(
         "Si comparas varios escenarios, la gráfica superpone sus respuestas y la tabla muestra el escenario seleccionado."
     )
+
+else:
+    st.subheader("Transformada de Laplace")
+    st.markdown(
+        r"Calcula la transformada directa $\mathcal{L}\{f(t)\}$ y la inversa $\mathcal{L}^{-1}\{F(s)\}$ para expresiones simbólicas."
+    )
+
+    if sp is None:
+        st.warning("Para usar esta sección instala la dependencia `sympy`.")
+        st.stop()
+
+    ejemplos_directa = ["sin(t)", "t**2", "exp(-2*t)*sin(3*t)"]
+    ejemplos_inversa = ["1/(s+1)", "s/(s**2 + 4)", "1/(s*(s+2))"]
+
+    tab_directa, tab_inversa = st.tabs(["Transformada directa", "Transformada inversa"])
+
+    with tab_directa:
+        expresion_directa = st.text_input(
+            "Ingresa f(t)",
+            value=ejemplos_directa[0],
+            help="Usa expresiones como sin(t), t**2 o exp(-2*t)*sin(3*t).",
+            key="laplace_directa_entrada",
+        )
+        if st.button("Calcular transformada", key="laplace_directa_boton") or expresion_directa:
+            expresion, resultado, error = resolver_laplace_directa(expresion_directa)
+            if error is not None:
+                st.error(error)
+            else:
+                st.latex(r"f(t) = " + sp.latex(expresion))
+                st.latex(r"\mathcal{L}\{f(t)\} = " + sp.latex(resultado))
+                st.caption("Ejemplos rápidos: " + ", ".join(ejemplos_directa))
+
+    with tab_inversa:
+        expresion_inversa = st.text_input(
+            "Ingresa F(s)",
+            value=ejemplos_inversa[0],
+            help="Usa expresiones como 1/(s+1), s/(s**2 + 4) o 1/(s*(s+2)).",
+            key="laplace_inversa_entrada",
+        )
+        if st.button("Calcular inversa", key="laplace_inversa_boton") or expresion_inversa:
+            expresion, resultado, error = resolver_laplace_inversa(expresion_inversa)
+            if error is not None:
+                st.error(error)
+            else:
+                st.latex(r"F(s) = " + sp.latex(expresion))
+                st.latex(r"\mathcal{L}^{-1}\{F(s)\} = " + sp.latex(resultado))
+                st.caption("Ejemplos rápidos: " + ", ".join(ejemplos_inversa))
